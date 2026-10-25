@@ -1,0 +1,4 @@
+# Zen mode bundle patch: one Host row whose Client half owns the whole surface.
+- insert:
+    - id: zen-mode
+      name: 'dsh-zen-mode'

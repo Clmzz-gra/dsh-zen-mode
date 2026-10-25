@@ -1,0 +1,81 @@
+# dsh-zen-mode
+
+[![npm](https://img.shields.io/npm/v/dsh-zen-mode.svg)](https://www.npmjs.com/package/dsh-zen-mode)
+[![license](https://img.shields.io/npm/l/dsh-zen-mode.svg)](./LICENSE)
+
+禅模式 for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): a full-screen minimal page that hides the whole DSH Web GUI while your tasks keep running, so waiting on an agent stops costing you attention.
+
+DSH 的任务在禅模式期间照常执行，不暂停、不打断。你只看到剩余时间、期间完成的会话名，和一个退出按钮。
+
+## Install
+
+```sh
+dsh plugin --profile <your-profile> add dsh-zen-mode
+```
+
+Restart the page (or the client) once so the browser loads the new UI module. The plugin is a bundle: it appends itself to `dsh.profile.bundles`, and no manual `cordis.patch.yml` edit is needed.
+
+To remove it:
+
+```sh
+dsh plugin --profile <your-profile> remove dsh-zen-mode
+```
+
+## Use
+
+Click **禅模式 / Zen mode** in the sidebar, under **插件** and **自动化任务**. The whole GUI is covered at once.
+
+| Part | What it shows |
+|---|---|
+| Left | The countdown, `25:00` by default, counting down every second. |
+| Right | The names of sessions that finished during this round, in completion order. Empty when nothing finished; no placeholder. |
+| Bottom-right | The exit button. |
+
+Nothing else is visible or reachable: no session list, no composer, no settings, no toasts. You cannot open a session without leaving zen mode first.
+
+### Countdown length
+
+Settings → General → **禅模式倒计时时长**. Whole minutes from 1 to 120, 25 by default. Every entry starts a fresh countdown; the length applies to the next round.
+
+### Exit
+
+Four independent ways out, so the page cannot trap you:
+
+1. The **退出 / Exit** button.
+2. `Esc`.
+3. The countdown reaching `00:00` — automatic exit.
+4. Reloading the page. The active flag lives only in page memory, so a reload always restores DSH.
+
+A failed unmount also cannot trap you: shortly after an explicit exit, if the page is somehow still covered, the plugin reloads the document.
+
+## What counts as a finished session
+
+A session is listed when its running state goes from running to idle. Subagent sessions are excluded. The plugin does not distinguish a normal completion from an aborted, blocked, or failed turn — every stop is listed the same way, because the page only answers "which task can I stop waiting on".
+
+Only completions inside the current round are listed. Sessions that were already finished when you entered are not replayed.
+
+## Boundaries
+
+- **Pure overlay.** Entering or leaving writes no session log entry, no setting, and no model-visible input. No session is paused, interrupted, or inspected beyond its public running state.
+- **Global, not per-session.** One page covers the whole client. Multiple browser tabs each run their own round.
+- **Leaving lands on the conversation.** The sidebar row is a panel entry, and the client exposes no public "current panel" read, so the exit restores the conversation rather than whichever panel you were on before.
+- **Coverage is the Web viewport.** The desktop window's native title bar buttons and browser-level shortcuts (reload, close tab, DevTools) stay outside it.
+- **No telemetry.** The plugin reports nothing anywhere.
+
+## Compatibility
+
+Tested against DSH `0.2.1-rc.2` on Windows. The plugin declares no dependency on any `@deepseek-ai/dsh-*` package: the browser half resolves React from the host's module table and registers through the slot API only, so it is not pinned to one DSH release. It needs a DSH build whose Web client provides `sidebar.panellist`, `shell.overlay`, `main`, and `settings.general.item`.
+
+## Files
+
+| File | Role |
+|---|---|
+| `index.js` | Host half; empty, because the browser half owns every visible part. |
+| `client.js` | Browser half: the sidebar row, the center-panel trigger, the full-screen page, and the Settings row. |
+| `cordis.patch.yml` | Bundle patch inserting the `zen-mode` Host row. |
+| `locale/*.json` | Plugin title and description shown in the plugin list. |
+| `icon.svg` | Plugin artwork. |
+
+## License
+
+MIT

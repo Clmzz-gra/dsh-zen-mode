@@ -1,0 +1,55 @@
+{
+  "name": "dsh-zen-mode",
+  "version": "0.1.0",
+  "description": "Zen mode for DeepSeek Harness: a full-screen minimal countdown that hides DSH while tasks run, showing only the remaining time, the sessions that finished during the round, and an exit button.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Clmzz-gra",
+  "homepage": "https://github.com/Clmzz-gra/dsh-zen-mode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Clmzz-gra/dsh-zen-mode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Clmzz-gra/dsh-zen-mode/issues"
+  },
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "zen",
+    "focus",
+    "countdown",
+    "pomodoro"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "locale/*.json",
+    "icon.svg"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
