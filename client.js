@@ -29,6 +29,10 @@ window.__ModuleLoader__.load({
     const STORAGE_KEY = 'dsh-zen-mode:duration-minutes'
     /** Countdown recompute cadence; the display is derived from a deadline, never accumulated. */
     const TICK_MS = 250
+    /** Mascot route served by the Host half; absent there, the image hides itself. */
+    const MASCOT_SRC = '/zen-mode/mascot.webp'
+    /** Rendered mascot edge in CSS pixels (the file is 160 px, so this stays sharp). */
+    const MASCOT_PX = 140
 
     const zh = {
       entry: '禅模式',
@@ -363,6 +367,9 @@ window.__ModuleLoader__.load({
               flexDirection: 'column',
               gap: 12,
               padding: '56px 32px',
+              // Keep the last rows clear of the mascot that floats over this
+              // column's bottom-right corner.
+              paddingBottom: 56 + MASCOT_PX,
               overflowY: 'auto',
               borderLeft: '1px solid var(--dsw-alias-border-l1)',
             },
@@ -415,29 +422,57 @@ window.__ModuleLoader__.load({
             ),
         ),
         h(
-          'button',
+          'div',
           {
-            type: 'button',
-            onClick: () => { zen.exit() },
-            'aria-label': exitLabel,
-            title: exitLabel,
             style: {
               position: 'absolute',
-              // Bottom-right keeps the control clear of the desktop window's
-              // native caption buttons, which own the top-right corner.
-              bottom: 32,
-              right: 32,
-              padding: '10px 22px',
-              fontSize: 15,
-              fontFamily: 'inherit',
-              color: 'var(--dsw-alias-label-secondary)',
-              background: 'transparent',
-              border: '1px solid var(--dsw-alias-border-l1)',
-              borderRadius: 10,
-              cursor: 'pointer',
+              // Bottom-right keeps both controls clear of the desktop window's
+              // native caption buttons, which own the top-right corner. The row
+              // bottom-aligns so the mascot never pushes the exit button around.
+              bottom: 16,
+              right: 16,
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 16,
             },
           },
-          exitLabel,
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: () => { zen.exit() },
+              'aria-label': exitLabel,
+              title: exitLabel,
+              style: {
+                padding: '10px 22px',
+                fontSize: 15,
+                fontFamily: 'inherit',
+                color: 'var(--dsw-alias-label-secondary)',
+                background: 'transparent',
+                border: '1px solid var(--dsw-alias-border-l1)',
+                borderRadius: 10,
+                cursor: 'pointer',
+              },
+            },
+            exitLabel,
+          ),
+          // Decoration only: the animation must never intercept a click, and a
+          // deployment whose Host serves no mascot route simply hides it.
+          h('img', {
+            src: MASCOT_SRC,
+            alt: '',
+            'aria-hidden': 'true',
+            'data-zen-mode-mascot': '',
+            draggable: false,
+            onError: (event) => { event.currentTarget.style.display = 'none' },
+            style: {
+              width: MASCOT_PX,
+              height: MASCOT_PX,
+              display: 'block',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            },
+          }),
         ),
       )
     }

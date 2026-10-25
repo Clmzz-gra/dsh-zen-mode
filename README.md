@@ -29,9 +29,13 @@ Click **禅模式 / Zen mode** in the sidebar, under **插件** and **自动化�
 |---|---|
 | Left | The countdown, `25:00` by default, counting down every second. |
 | Right | **已完成会话 / Completed sessions**, then the names of sessions that finished during this round, in completion order. The heading and the whole column are absent while nothing has finished. |
-| Bottom-right | The exit button. |
+| Bottom-right | The exit button, and beside it the mascot animation. |
 
 Nothing else is visible or reachable: no session list, no composer, no settings, no toasts. You cannot open a session without leaving zen mode first.
+
+### Mascot
+
+The bottom-right corner shows a small looping animation. It is decoration only: it never takes a click, and a deployment whose Host serves no mascot route simply hides it. The shipped `mascot.webp` is an animated WebP, 160×160 at 15 fps over 5 seconds (about 283 KB); the original source was a 40 MB, 1280×1280, 30 fps GIF.
 
 ### Countdown length
 
@@ -70,8 +74,9 @@ Tested against DSH `0.2.1-rc.2` on Windows. The plugin declares no dependency on
 
 | File | Role |
 |---|---|
-| `index.js` | Host half; empty, because the browser half owns every visible part. |
+| `index.js` | Host half: serves `mascot.webp` at `/zen-mode/mascot.webp`, since a client bundle cannot reach a sibling file. |
 | `client.js` | Browser half: the sidebar row, the center-panel trigger, the full-screen page, and the Settings row. |
+| `mascot.webp` | The bottom-right animation. |
 | `cordis.patch.yml` | Bundle patch inserting the `zen-mode` Host row. |
 | `locale/*.json` | Plugin title and description shown in the plugin list. |
 | `icon.svg` | Plugin artwork. |
