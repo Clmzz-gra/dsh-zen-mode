@@ -34,6 +34,7 @@ window.__ModuleLoader__.load({
       entry: '禅模式',
       exit: '退出',
       countdownAria: '禅模式倒计时',
+      completedTitle: '已完成会话',
       completedAria: '禅模式期间完成的会话',
       settingsTitle: '禅模式倒计时时长',
       settingsHint: '每次进入禅模式都重新计时，默认 25 分钟。',
@@ -44,6 +45,7 @@ window.__ModuleLoader__.load({
       entry: 'Zen mode',
       exit: 'Exit',
       countdownAria: 'Zen mode countdown',
+      completedTitle: 'Completed sessions',
       completedAria: 'Sessions finished during zen mode',
       settingsTitle: 'Zen mode countdown length',
       settingsHint: 'Every entry restarts the countdown; 25 minutes by default.',
@@ -338,11 +340,12 @@ window.__ModuleLoader__.load({
               role: 'timer',
               'aria-label': t('countdownAria'),
               style: {
-                fontSize: 'clamp(56px, 12vw, 176px)',
+                fontSize: 'clamp(48px, 11vw, 150px)',
                 fontWeight: 200,
                 lineHeight: 1,
                 letterSpacing: '0.02em',
                 fontVariantNumeric: 'tabular-nums',
+                whiteSpace: 'nowrap',
                 color: 'var(--dsw-alias-label-primary)',
                 userSelect: 'none',
               },
@@ -367,27 +370,48 @@ window.__ModuleLoader__.load({
           completions.length === 0
             ? null
             : h(
-              'ul',
-              {
-                'aria-label': t('completedAria'),
-                style: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 },
-              },
-              completions.map((title, index) => h(
-                'li',
+              React.Fragment,
+              null,
+              // The heading exists only with at least one row: an empty right
+              // column stays completely empty, so it never reads as a list that
+              // failed to load.
+              h(
+                'div',
                 {
-                  key: index + ':' + title,
-                  title,
                   style: {
-                    fontSize: 15,
-                    lineHeight: 1.5,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    letterSpacing: '0.08em',
                     color: 'var(--dsw-alias-label-secondary)',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    opacity: 0.72,
+                    userSelect: 'none',
                   },
                 },
-                title,
-              )),
+                t('completedTitle'),
+              ),
+              h(
+                'ul',
+                {
+                  'aria-label': t('completedAria'),
+                  style: { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 10 },
+                },
+                completions.map((title, index) => h(
+                  'li',
+                  {
+                    key: index + ':' + title,
+                    title,
+                    style: {
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                      color: 'var(--dsw-alias-label-secondary)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    },
+                  },
+                  title,
+                )),
+              ),
             ),
         ),
         h(

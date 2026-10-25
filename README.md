@@ -28,7 +28,7 @@ Click **禅模式 / Zen mode** in the sidebar, under **插件** and **自动化�
 | Part | What it shows |
 |---|---|
 | Left | The countdown, `25:00` by default, counting down every second. |
-| Right | The names of sessions that finished during this round, in completion order. Empty when nothing finished; no placeholder. |
+| Right | **已完成会话 / Completed sessions**, then the names of sessions that finished during this round, in completion order. The heading and the whole column are absent while nothing has finished. |
 | Bottom-right | The exit button. |
 
 Nothing else is visible or reachable: no session list, no composer, no settings, no toasts. You cannot open a session without leaving zen mode first.
