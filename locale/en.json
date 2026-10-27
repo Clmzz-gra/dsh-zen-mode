@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Zen Mode",
-    "description": "Covers DSH with one minimal countdown page: remaining time, sessions finished during the round, and an exit button."
+    "description": "Covers DSH with one minimal timer page: count up by default or switch to count down; the timer, sessions finished during the round, and an exit button, nothing else."
   }
 }

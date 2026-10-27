@@ -27,7 +27,15 @@ window.__ModuleLoader__.load({
     const MAX_MINUTES = 120
     /** Browser storage key holding the chosen countdown length. */
     const STORAGE_KEY = 'dsh-zen-mode:duration-minutes'
-    /** Countdown recompute cadence; the display is derived from a deadline, never accumulated. */
+    /** Browser storage key holding the chosen timer direction. */
+    const MODE_STORAGE_KEY = 'dsh-zen-mode:mode'
+    /** Counts up from zero and never ends on its own. */
+    const MODE_UP = 'up'
+    /** Counts down from the configured length and exits at zero. */
+    const MODE_DOWN = 'down'
+    /** Timer direction used when the user has not chosen one. */
+    const DEFAULT_MODE = MODE_UP
+    /** Timer recompute cadence; the display is derived from a timestamp, never accumulated. */
     const TICK_MS = 250
     /** Mascot route served by the Host half; absent there, the image hides itself. */
     const MASCOT_SRC = '/zen-mode/mascot.webp'
@@ -37,22 +45,32 @@ window.__ModuleLoader__.load({
     const zh = {
       entry: '禅模式',
       exit: '退出',
-      countdownAria: '禅模式倒计时',
+      timerAria: '禅模式计时',
       completedTitle: '已完成会话',
       completedAria: '禅模式期间完成的会话',
-      settingsTitle: '禅模式倒计时时长',
-      settingsHint: '每次进入禅模式都重新计时，默认 25 分钟。',
+      modeLabel: '计时方式',
+      modeUp: '正计时',
+      modeDown: '倒计时',
+      modeHintUp: '从 0 开始累计，不会自动退出。',
+      modeHintDown: '从设定时长开始倒数，到 0 自动退出。',
+      settingsTitle: '倒计时时长',
+      settingsHint: '仅在倒计时方式下生效，每次进入都重新开始。',
       settingsInvalid: '请输入 1 到 120 之间的整数。',
       settingsUnit: '分钟',
     }
     const en = {
       entry: 'Zen mode',
       exit: 'Exit',
-      countdownAria: 'Zen mode countdown',
+      timerAria: 'Zen mode timer',
       completedTitle: 'Completed sessions',
       completedAria: 'Sessions finished during zen mode',
-      settingsTitle: 'Zen mode countdown length',
-      settingsHint: 'Every entry restarts the countdown; 25 minutes by default.',
+      modeLabel: 'Timer direction',
+      modeUp: 'Count up',
+      modeDown: 'Count down',
+      modeHintUp: 'Counts up from zero and never ends on its own.',
+      modeHintDown: 'Counts down from the set length and exits at zero.',
+      settingsTitle: 'Countdown length',
+      settingsHint: 'Applies to count-down only; every entry restarts it.',
       settingsInvalid: 'Enter a whole number from 1 to 120.',
       settingsUnit: 'minutes',
     }
@@ -85,26 +103,70 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * Format remaining milliseconds as mm:ss.
-     * @param remainingMs - milliseconds left, possibly negative.
+     * Read the configured timer direction.
+     * @returns the stored direction, or the default when absent or unrecognized.
+     */
+    function readMode() {
+      try {
+        const raw = window.localStorage.getItem(MODE_STORAGE_KEY)
+        if (raw === MODE_UP || raw === MODE_DOWN) return raw
+      } catch (error) {
+        // Private-mode or disabled storage: the default still works.
+      }
+      return DEFAULT_MODE
+    }
+
+    /**
+     * Persist the timer direction; storage failures keep the in-memory choice.
+     * @param mode - the validated direction.
+     */
+    function writeMode(mode) {
+      try {
+        window.localStorage.setItem(MODE_STORAGE_KEY, mode)
+      } catch (error) {
+        // Private-mode or disabled storage: the choice lasts for this page only.
+      }
+    }
+
+    /**
+     * Format whole seconds as mm:ss, widening to h:mm:ss past an hour so a
+     * count-up round can run as long as the user leaves it.
+     * @param totalSeconds - seconds to show, already rounded by the caller.
      * @returns the display text, never below 00:00.
      */
-    function formatRemaining(remainingMs) {
-      const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000))
-      const minutes = Math.floor(totalSeconds / 60)
-      const seconds = totalSeconds % 60
+    function formatClock(totalSeconds) {
+      const safe = Math.max(0, totalSeconds)
+      const hours = Math.floor(safe / 3600)
+      const minutes = Math.floor((safe % 3600) / 60)
+      const seconds = safe % 60
       const pad = (value) => (value < 10 ? '0' + value : String(value))
+      if (hours > 0) return hours + ':' + pad(minutes) + ':' + pad(seconds)
       return pad(minutes) + ':' + pad(seconds)
     }
 
     /**
-     * The single zen-mode state: whether it is active, when this round ends, and
-     * which sessions finished meanwhile. Every mutation publishes one new
-     * snapshot so React subscribers never read a half-updated round.
+     * The seconds the page shows for one snapshot. Count-down rounds ceil so a
+     * fresh 25-minute round reads 25:00 rather than 24:59; count-up rounds floor
+     * so a fresh round reads 00:00.
+     * @param snapshot - the current round.
+     * @returns whole seconds.
+     */
+    function displaySeconds(snapshot) {
+      return snapshot.mode === MODE_UP
+        ? Math.floor(snapshot.shownMs / 1000)
+        : Math.ceil(snapshot.shownMs / 1000)
+    }
+
+    /**
+     * The single zen-mode state: whether it is active, which direction the timer
+     * runs, the timestamp that direction derives from, and which sessions
+     * finished meanwhile. Every mutation publishes one new snapshot so React
+     * subscribers never read a half-updated round.
      * @returns the controller shared by the entry, the page, and the ticker.
      */
     function createZenController() {
-      let snapshot = { active: false, endsAt: 0, remainingMs: 0, completions: [] }
+      /** `startedAt` drives a count-up round; `endsAt` drives a count-down one. */
+      let snapshot = { active: false, mode: DEFAULT_MODE, startedAt: 0, endsAt: 0, shownMs: 0, completions: [] }
       const listeners = new Set()
       let ticker = null
       /** Monotonic round counter, so a pending exit fallback cannot act on a newer round. */
@@ -116,7 +178,10 @@ window.__ModuleLoader__.load({
       }
       const close = () => {
         if (!snapshot.active) return
-        publish({ active: false, endsAt: 0, remainingMs: 0, completions: snapshot.completions })
+        publish({ active: false, mode: snapshot.mode, startedAt: 0, endsAt: 0, shownMs: 0, completions: snapshot.completions })
+      }
+      const step = (shownMs) => {
+        publish({ active: true, mode: snapshot.mode, startedAt: snapshot.startedAt, endsAt: snapshot.endsAt, shownMs, completions: snapshot.completions })
       }
 
       return {
@@ -129,36 +194,43 @@ window.__ModuleLoader__.load({
         getSnapshot() {
           return snapshot
         },
-        /** Start the countdown ticker (idempotent). */
+        /** Start the timer ticker (idempotent). */
         start() {
           if (ticker !== null) return
           ticker = window.setInterval(() => {
             if (!snapshot.active) return
+            // Both directions derive from a timestamp, never from an accumulator:
+            // a sleeping or throttled tab lands on the right value on its next
+            // tick instead of drifting by the time it lost.
+            if (snapshot.mode === MODE_UP) {
+              const elapsed = Date.now() - snapshot.startedAt
+              if (Math.floor(elapsed / 1000) !== Math.floor(snapshot.shownMs / 1000)) step(elapsed)
+              return
+            }
             const remaining = snapshot.endsAt - Date.now()
             if (remaining <= 0) {
               close()
               return
             }
-            // Publish only when the displayed second moves; a sleeping or
-            // throttled tab still lands on the right value because the
-            // remaining time is always derived from the deadline.
-            if (Math.ceil(remaining / 1000) !== Math.ceil(snapshot.remainingMs / 1000)) {
-              publish({ active: true, endsAt: snapshot.endsAt, remainingMs: remaining, completions: snapshot.completions })
-            }
+            if (Math.ceil(remaining / 1000) !== Math.ceil(snapshot.shownMs / 1000)) step(remaining)
           }, TICK_MS)
         },
-        /** Stop the countdown ticker. */
+        /** Stop the timer ticker. */
         stop() {
           if (ticker === null) return
           window.clearInterval(ticker)
           ticker = null
         },
-        /** Begin a fresh round: new deadline, empty completion list. */
+        /** Begin a fresh round from the stored direction, with an empty completion list. */
         enter() {
           round += 1
-          const minutes = readDurationMinutes()
-          const durationMs = minutes * 60 * 1000
-          publish({ active: true, endsAt: Date.now() + durationMs, remainingMs: durationMs, completions: [] })
+          const mode = readMode()
+          if (mode === MODE_UP) {
+            publish({ active: true, mode, startedAt: Date.now(), endsAt: 0, shownMs: 0, completions: [] })
+            return
+          }
+          const durationMs = readDurationMinutes() * 60 * 1000
+          publish({ active: true, mode, startedAt: 0, endsAt: Date.now() + durationMs, shownMs: durationMs, completions: [] })
         },
         /** Leave zen mode. */
         exit() {
@@ -181,7 +253,7 @@ window.__ModuleLoader__.load({
         addCompletion(title) {
           if (!snapshot.active) return
           if (typeof title !== 'string' || title.length === 0) return
-          publish({ active: true, endsAt: snapshot.endsAt, remainingMs: snapshot.remainingMs, completions: snapshot.completions.concat([title]) })
+          publish({ active: true, mode: snapshot.mode, startedAt: snapshot.startedAt, endsAt: snapshot.endsAt, shownMs: snapshot.shownMs, completions: snapshot.completions.concat([title]) })
         },
       }
     }
@@ -342,7 +414,8 @@ window.__ModuleLoader__.load({
             'div',
             {
               role: 'timer',
-              'aria-label': t('countdownAria'),
+              'aria-label': t('timerAria'),
+              'data-zen-mode-direction': snapshot.mode,
               style: {
                 fontSize: 'clamp(48px, 11vw, 150px)',
                 fontWeight: 200,
@@ -354,7 +427,7 @@ window.__ModuleLoader__.load({
                 userSelect: 'none',
               },
             },
-            formatRemaining(snapshot.remainingMs),
+            formatClock(displaySeconds(snapshot)),
           ),
         ),
         h(
@@ -478,14 +551,22 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The Settings row that owns the countdown length.
+     * The Settings row that owns the timer direction and, for count-down, the
+     * length. Both preferences are stored per page so the next round picks them
+     * up without touching a Host setting.
      * @param props - the synthesized translate seat.
-     * @returns one label-and-input row.
+     * @returns the preference rows.
      */
     function ZenSettingsRow(props) {
       const t = typeof props.t === 'function' ? props.t : (key) => key
+      const [mode, setMode] = React.useState(readMode)
       const [draft, setDraft] = React.useState(() => String(readDurationMinutes()))
       const [invalid, setInvalid] = React.useState(false)
+
+      const chooseMode = (next) => {
+        writeMode(next)
+        setMode(next)
+      }
       const onChange = (event) => {
         const raw = event.target.value
         setDraft(raw)
@@ -494,42 +575,89 @@ window.__ModuleLoader__.load({
         setInvalid(!valid)
         if (valid) writeDurationMinutes(parsed)
       }
+      const modeButton = (value, label) => h(
+        'button',
+        {
+          type: 'button',
+          onClick: () => { chooseMode(value) },
+          'aria-pressed': mode === value,
+          style: {
+            padding: '6px 14px',
+            fontSize: 13,
+            fontFamily: 'inherit',
+            color: mode === value ? 'var(--dsw-alias-label-primary)' : 'var(--dsw-alias-label-secondary)',
+            background: mode === value ? 'var(--dsw-alias-bg-layer-2)' : 'transparent',
+            border: '1px solid ' + (mode === value ? 'var(--dsw-alias-border-l2)' : 'var(--dsw-alias-border-l1)'),
+            borderRadius: 8,
+            cursor: 'pointer',
+          },
+        },
+        label,
+      )
+
       return h(
         'div',
-        { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24, padding: '12px 0' } },
+        { style: { display: 'flex', flexDirection: 'column', gap: 14, padding: '12px 0' } },
         h(
           'div',
-          { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 } },
-          h('span', { style: { fontSize: 14, color: 'var(--dsw-alias-label-primary)' } }, t('settingsTitle')),
+          { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 } },
           h(
-            'span',
-            { style: { fontSize: 12, color: invalid ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)' } },
-            invalid ? t('settingsInvalid') : t('settingsHint'),
+            'div',
+            { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 } },
+            h('span', { style: { fontSize: 14, color: 'var(--dsw-alias-label-primary)' } }, t('modeLabel')),
+            h(
+              'span',
+              { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } },
+              mode === MODE_UP ? t('modeHintUp') : t('modeHintDown'),
+            ),
+          ),
+          h(
+            'div',
+            { style: { display: 'flex', gap: 6, flex: 'none' } },
+            modeButton(MODE_UP, t('modeUp')),
+            modeButton(MODE_DOWN, t('modeDown')),
           ),
         ),
-        h(
-          'div',
-          { style: { display: 'flex', alignItems: 'center', gap: 8, flex: 'none' } },
-          h('input', {
-            type: 'number',
-            min: MIN_MINUTES,
-            max: MAX_MINUTES,
-            value: draft,
-            'aria-label': t('settingsTitle'),
-            onChange,
-            style: {
-              width: 72,
-              padding: '6px 8px',
-              fontSize: 14,
-              fontFamily: 'inherit',
-              color: 'var(--dsw-alias-label-primary)',
-              background: 'var(--dsw-alias-bg-layer-1)',
-              border: '1px solid var(--dsw-alias-border-l1)',
-              borderRadius: 8,
-            },
-          }),
-          h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('settingsUnit')),
-        ),
+        // The length only has a meaning while counting down.
+        mode === MODE_DOWN
+          ? h(
+            'div',
+            { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 } },
+            h(
+              'div',
+              { style: { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 } },
+              h('span', { style: { fontSize: 14, color: 'var(--dsw-alias-label-primary)' } }, t('settingsTitle')),
+              h(
+                'span',
+                { style: { fontSize: 12, color: invalid ? 'var(--dsw-alias-state-error-primary)' : 'var(--dsw-alias-label-secondary)' } },
+                invalid ? t('settingsInvalid') : t('settingsHint'),
+              ),
+            ),
+            h(
+              'div',
+              { style: { display: 'flex', alignItems: 'center', gap: 8, flex: 'none' } },
+              h('input', {
+                type: 'number',
+                min: MIN_MINUTES,
+                max: MAX_MINUTES,
+                value: draft,
+                'aria-label': t('settingsTitle'),
+                onChange,
+                style: {
+                  width: 72,
+                  padding: '6px 8px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  color: 'var(--dsw-alias-label-primary)',
+                  background: 'var(--dsw-alias-bg-layer-1)',
+                  border: '1px solid var(--dsw-alias-border-l1)',
+                  borderRadius: 8,
+                },
+              }),
+              h('span', { style: { fontSize: 12, color: 'var(--dsw-alias-label-secondary)' } }, t('settingsUnit')),
+            ),
+          )
+          : null,
       )
     }
 

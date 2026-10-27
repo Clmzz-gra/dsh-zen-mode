@@ -5,7 +5,9 @@
 
 禅模式 for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness): a full-screen minimal page that hides the whole DSH Web GUI while your tasks keep running, so waiting on an agent stops costing you attention.
 
-DSH 的任务在禅模式期间照常执行，不暂停、不打断。你只看到剩余时间、期间完成的会话名，和一个退出按钮。
+DSH 的任务在禅模式期间照常执行，不暂停、不打断。你只看到计时、期间完成的会话名，和一个退出按钮。
+
+计时默认是**正计时**：从 00:00 开始累计，不会自动结束。想要番茄钟那种到点自动退出的，在设置里切成倒计时。
 
 ## Install
 
@@ -27,7 +29,7 @@ Click **禅模式 / Zen mode** in the sidebar, under **插件** and **自动化�
 
 | Part | What it shows |
 |---|---|
-| Left | The countdown, `25:00` by default, counting down every second. |
+| Left | The timer. **Count-up is the default**: it starts at `00:00` and accumulates, widening to `h:mm:ss` past an hour. Switch to count-down in Settings and it starts at the configured length and exits at zero. |
 | Right | **已完成会话 / Completed sessions**, then the names of sessions that finished during this round, in completion order. The heading and the whole column are absent while nothing has finished. |
 | Bottom-right | The exit button, and beside it the mascot animation. |
 
@@ -37,9 +39,11 @@ Nothing else is visible or reachable: no session list, no composer, no settings,
 
 The bottom-right corner shows a small looping animation. It is decoration only: it never takes a click, and a deployment whose Host serves no mascot route simply hides it. The shipped `mascot.webp` is an animated WebP, 160×160 at 15 fps over 5 seconds (about 283 KB); the original source was a 40 MB, 1280×1280, 30 fps GIF.
 
-### Countdown length
+### Timer direction and length
 
-Settings → General → **禅模式倒计时时长**. Whole minutes from 1 to 120, 25 by default. Every entry starts a fresh countdown; the length applies to the next round.
+Settings → General → **计时方式 / Timer direction** picks between **正计时 / Count up** (the default) and **倒计时 / Count down**. The choice applies to the next round.
+
+Count-down additionally shows **倒计时时长 / Countdown length**: whole minutes from 1 to 120, 25 by default, restarted on every entry. The field is hidden while count-up is selected, because it has no meaning there.
 
 ### Exit
 
@@ -47,7 +51,7 @@ Four independent ways out, so the page cannot trap you:
 
 1. The **退出 / Exit** button.
 2. `Esc`.
-3. The countdown reaching `00:00` — automatic exit.
+3. The countdown reaching `00:00` — automatic exit. This exists only in count-down mode; a count-up round never ends on its own, so leaving is always explicit.
 4. Reloading the page. The active flag lives only in page memory, so a reload always restores DSH.
 
 A failed unmount also cannot trap you: shortly after an explicit exit, if the page is somehow still covered, the plugin reloads the document.
@@ -80,6 +84,7 @@ Tested against DSH `0.2.1-rc.2` on Windows. The plugin declares no dependency on
 | `cordis.patch.yml` | Bundle patch inserting the `zen-mode` Host row. |
 | `locale/*.json` | Plugin title and description shown in the plugin list. |
 | `icon.svg` | Plugin artwork. |
+| `test-logic.mjs` | Keyless logic test: drives the controller with a controlled clock and a stub slot runtime. Run `node test-logic.mjs`; it is not part of the published package. |
 
 ## License
 
