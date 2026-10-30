@@ -72,7 +72,16 @@ Only completions inside the current round are listed. Sessions that were already
 
 ## Compatibility
 
-Tested against DSH `0.2.1-rc.2` on Windows. The plugin declares no dependency on any `@deepseek-ai/dsh-*` package: the browser half resolves React from the host's module table and registers through the slot API only, so it is not pinned to one DSH release. It needs a DSH build whose Web client provides `sidebar.panellist`, `shell.overlay`, `main`, and `settings.general.item`.
+Tested against DSH `0.2.1-rc.2` and `0.2.1-rc.5` on Windows. The plugin declares no dependency on any `@deepseek-ai/dsh-*` package: the browser half resolves React from the host's module table and registers through the slot API only, so it is not pinned to one DSH release. It needs a DSH build whose Web client provides `sidebar.panellist`, `shell.overlay`, `main`, and `settings.general.item`.
+
+### If the plugin list reports it as `missing`
+
+That state means the installed copy is a `link:` to a directory that no longer exists — a local-development setup whose target was moved or deleted, not a version incompatibility. Reinstall from the registry, which carries its own copy and cannot dangle:
+
+```sh
+dsh plugin --profile <your-profile> remove dsh-zen-mode
+dsh plugin --profile <your-profile> add dsh-zen-mode
+```
 
 ## Files
 

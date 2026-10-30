@@ -1,6 +1,6 @@
 {
   "name": "dsh-zen-mode",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Zen mode for DeepSeek Harness: a full-screen minimal timer that hides DSH while tasks run, showing only the elapsed or remaining time, the sessions that finished during the round, and an exit button.",
   "type": "module",
   "license": "MIT",
